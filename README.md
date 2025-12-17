@@ -107,6 +107,8 @@ Output filenames are created as:
 
 ## Real-Time Microphone Demo
 
+![Real-time DPDFNet demo screen shot](figures/live_demo.png "Real-time DPDFNet demo screen shot")
+
 The real-time demo performs streaming enhancement on microphone input, displays **Noisy vs Enhanced** live spectrograms, and lets you switch playback between the two.
 
 ### Run
