@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>DPDFNet</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Favicon (headset emoji as SVG) -->
+<link rel="icon" type="image/x-icon" href="./fig/favicon.ico"/>
+<!-- Meta -->
+<meta content=" extends DeepFilterNet with dual-path RNN blocks to improve long-range temporal and cross-band modeling for causal single-channel speech enhancement." name="description"/>
+<meta content=" — Boosting DeepFilterNet via Dual-Path RNN" property="og:title"/>
+<meta content="Causal single-channel speech enhancement with dual-path RNNs" property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="assets/og-image.png" property="og:image"/>
+<!-- Theme: Light Orange -->
+<style>
+    :root{
+      --bg: #ffffff;
+      --bg-tint-1: #fff7f1;
+      --panel: #ffffff;
+      --panel-2: #ffffff;
+      --text: #182025;
+      --muted: #5f6b72;
+      --line: rgba(255, 122, 26, 0.18);
+      --line-soft: rgba(0,0,0,0.08);
+      --accent: #ff7a1a;        /* primary orange */
+      --accent-2: #ff9a4a;      /* secondary orange */
+      --accent-ink:#7a3b00;
+      --radius: 16px;
+      --shadow: 0 10px 24px rgba(0,0,0,0.08);
+      --maxw: 1100px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color:var(--text);
+      background:
+        radial-gradient(1200px 700px at 10% -10%, rgba(255,122,26,0.08), transparent 55%),
+        radial-gradient(900px 600px at 90% 0%, rgba(255,154,74,0.06), transparent 60%),
+        var(--bg);
+      line-height:1.6;
+    }
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline;text-underline-offset:2px}
+    .wrap{max-width:var(--maxw);margin:0 auto;padding:24px 20px 80px}
+
+    /* Top bar */
+    header{
+      position:sticky; top:0; z-index:40;
+      backdrop-filter:saturate(140%) blur(6px);
+      background:linear-gradient(180deg, rgba(255,255,255,0.90), rgba(255,255,255,0.85));
+      border-bottom:1px solid var(--line-soft);
+    }
+    .bar{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 20px; }
+    .brand{display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:.2px}
+    .brand-logo{width:140px; height:68px; display:block; object-fit:contain; border-radius:10px; background:#fff; box-shadow:0 6px 18px rgba(255,122,26,0.12)}
+
+    /* Hero */
+    .hero{display:flex; justify-content:center; padding:64px 20px 28px}
+    .hero-card{
+      max-width:var(--maxw); width:100%;
+      background:linear-gradient(180deg, var(--panel), var(--panel-2));
+      border:1px solid var(--line-soft);
+      border-radius:20px;
+      box-shadow:var(--shadow);
+      padding:38px 26px;
+      text-align:center;
+    }
+    h1{font-size: clamp(30px, 5vw, 56px); line-height:1.08; margin:0 0 10px; letter-spacing:-0.02em}
+    h1 .em{
+      background:linear-gradient(90deg, var(--accent), var(--accent-2));
+      -webkit-background-clip:text; background-clip:text; color:transparent;
+    }
+    .subtitle{color:var(--muted); font-size:16px; margin:6px 0 0}
+    .authors{margin:16px 0 8px; color:var(--muted)}
+    .authors .author{margin:0 6px;}
+
+    /* Buttons */
+    .actions{display:flex; justify-content:center; gap:12px; flex-wrap:wrap; margin-top:18px}
+    .btn{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:10px 14px; border-radius:999px; font-weight:700;
+      background:#fff; color:var(--text);
+      border:1px solid var(--line-soft); box-shadow:0 8px 22px rgba(0,0,0,0.05);
+      transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, background-color .12s ease;
+    }
+    .btn:hover{ transform:translateY(-1px); border-color:var(--accent); box-shadow:0 10px 26px rgba(255,122,26,0.18) }
+    .btn.primary{
+      border:1px solid var(--accent); color:#000;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent), white 14%), color-mix(in srgb, var(--accent-2), white 8%));
+    }
+    .btn .emoji{font-size:18px;}
+
+    /* Section */
+    section{margin-top:34px}
+    section h2{
+      font-size: clamp(22px, 2.6vw, 32px);
+      margin:0 0 14px; letter-spacing:-0.01em; position:relative; text-align:center;
+    }
+    section h2::after{
+      content:""; position:absolute; left:50%; transform:translateX(-50%); bottom:-10px;
+      width:380px; max-width:70%; height:4px; border-radius:4px;
+      background:linear-gradient(90deg, var(--accent), var(--accent-2)); opacity:.9;
+    }
+
+    /* Cards */
+    .card{
+      background:var(--panel);
+      border:1px solid var(--line-soft); border-radius:18px; padding:22px; box-shadow:var(--shadow)
+    }
+
+    
+
+/* Audio grid (viewport-fit, compact aesthetic) */
+.examples {
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ex-grid {
+  display: grid;
+  grid-template-columns: 130px repeat(5, 1fr);
+  gap: 6px;
+  align-items: center;
+  text-align: center;
+  font-size: 12px;
+  width: 100%;
+  max-width: 100%;
+  /* ensure first column is left aligned for tags */
+}
+
+.ex-grid .head {
+  font-size: 12px;
+  color: #5f6b72;            /* restore original muted color */
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: none;      /* keep natural case as requested */
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ex-row {
+  display: contents;
+}
+
+.ex-grid .tag {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;          /* readable but not overbearing */
+  color: var(--accent-ink);  /* readable dark orange-brown text */
+}
+
+.ex-grid .tag .pill {
+  font-size: 11px;
+  padding: 4px 10px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent), white 92%);
+  color: #3a2200;
+  border-radius: 999px;   /* <- make the orange box fully rounded */
+  display: inline-block;  /* ensure radius renders correctly around content */
+  line-height: 1.1;
+}
+
+.audio {
+  width: 100%;
+  height: 26px;
+  transform: scale(0.95);
+  transform-origin: center;
+}
+
+audio::-webkit-media-controls-panel {
+  transform: scale(0.9);
+  transform-origin: center;
+}
+
+@media (max-width: 900px) {
+  .ex-grid {
+    grid-template-columns: 110px repeat(5, 1fr);
+    font-size: 11px;
+  }
+}
+
+.examples {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ex-grid {
+  display: grid;
+  grid-template-columns: 160px repeat(5, minmax(120px, 1fr));
+  gap: 8px;
+  align-items: center;
+  text-align: center;
+  font-size: 13px;
+  min-width: 920px;
+}
+
+.ex-grid .head {
+  font-size: 12px;
+  color: #5f6b72;            /* restore original muted color */
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: none;      /* keep natural case as requested */
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ex-row {
+  display: contents;
+}
+
+.ex-grid .tag {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;          /* readable but not overbearing */
+  color: var(--accent-ink);  /* readable dark orange-brown text */
+}
+
+.ex-grid .tag .pill {
+  font-size: 11px;
+  padding: 4px 10px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent), white 92%);
+  color: #3a2200;
+  border-radius: 999px;   /* <- make the orange box fully rounded */
+  display: inline-block;  /* ensure radius renders correctly around content */
+  line-height: 1.1;
+}
+
+.audio {
+  width: 100%;
+  min-width: 110px;
+}
+
+@media (max-width: 900px) {
+  .ex-grid {
+    min-width: 800px;
+  }
+}
+
+.examples {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ex-grid {
+  display: grid;
+  grid-template-columns: 140px repeat(5, minmax(120px, 1fr));
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  min-width: 900px; /* ensures all columns stay in one line */
+}
+
+.ex-grid .head {
+  font-size: 12px;
+  color: #5f6b72;            /* restore original muted color */
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: none;      /* keep natural case as requested */
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ex-grid .tag .pill {
+  font-size: 11px;
+  padding: 4px 10px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent), white 92%);
+  color: #3a2200;
+  border-radius: 999px;   /* <- make the orange box fully rounded */
+  display: inline-block;  /* ensure radius renders correctly around content */
+  line-height: 1.1;
+}
+
+.audio {
+  width: 100%;
+  min-width: 110px;
+}
+
+@media (max-width: 900px) {
+  .ex-grid {
+    min-width: 800px;
+  }
+}
+
+
+/* Code block */
+    pre.code{
+      background:#fafbfc; border:1px solid var(--line-soft); border-radius:14px; padding:14px;
+      overflow:auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:13px; color:#0f1720;
+    }
+
+    footer{margin-top:60px; padding-top:20px; border-top:1px dashed var(--line-soft); color:var(--muted); text-align:center}
+  
+    /* DyPE-style link group + buttons (bright, orange) */
+    .publication-links{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:18px}
+    .publication-links .link-block{display:inline-flex}
+    .button{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:10px 16px;border-radius:999px;font-weight:700;
+      border:1px solid var(--line-soft); background:#fff; color:var(--text);
+      box-shadow:0 8px 22px rgba(0,0,0,0.05);
+      transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease, background-color .12s ease;
+    }
+    .button:hover{ transform:translateY(-1px); border-color:var(--accent); box-shadow:0 10px 26px rgba(255,122,26,0.18) }
+    .button.is-rounded{border-radius:999px}
+    .button.is-normal{font-size:14px; line-height:1}
+    .button .icon{display:inline-flex}
+    .button.is-orange{
+      border:1px solid var(--accent);
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent), white 14%), color-mix(in srgb, var(--accent-2), white 8%));
+      color:#111;
+    }
+    .button.is-orange.is-outlined{
+      background:#fff; color:var(--text); border:1px solid var(--accent);
+    }
+
+
+
+/* === Clean hero (no frame) ===================================== */
+.hero-card{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+
+
+/* === Force plain white page background === */
+:root{ --bg: #ffffff !important; }
+html, body{
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+
+
+/* Header casing fix */
+.ex-grid .head {
+  font-size: 12px;
+  color: #5f6b72;            /* restore original muted color */
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: none;      /* keep natural case as requested */
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* First column orange theme */
+.ex-grid .tag {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;          /* readable but not overbearing */
+  color: var(--accent-ink);  /* readable dark orange-brown text */
+}
+
+/* Keep the orange pill aesthetic */
+.ex-grid .tag .pill {
+  font-size: 11px;
+  padding: 4px 10px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent), white 92%);
+  color: #3a2200;
+  border-radius: 999px;   /* <- make the orange box fully rounded */
+  display: inline-block;  /* ensure radius renders correctly around content */
+  line-height: 1.1;
+}
+</style>
+<!-- Icons (from DyPE) -->
+<link as="style" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css" onload="this.onload=null;this.rel='stylesheet'" rel="preload"/>
+<link as="style" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'" rel="preload"/>
+<noscript>
+<link href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css" rel="stylesheet"/>
+</noscript>
+<style>
+/* Added minimal TL;DR styling */
+.tldr{margin:1.25rem 0;}
+.tldr h2{margin-top:0;margin-bottom:0.5rem}
+</style>
+<style>
+
+/* Light gray page background */
+html, body { background-color: #f5f5f5 !important; }
+
+</style>
+<style>
+
+/* Increase space between box titles and content */
+.card :is(h1,h2,h3,h4):first-child{
+  padding-bottom: 8px;
+  margin-bottom: 18px !important;
+}
+
+/* Add extra top spacing before the examples table/grid */
+.examples{
+  margin-top: 24px !important;
+  padding-top: 6px;
+}
+
+</style>
+<style>
+
+/* Space after the horizontal line under box titles */
+.card h2:first-child{
+  position: relative;
+  /* include space for the underline and extra breathing room */
+  margin-bottom: 34px !important;
+}
+.card h2:first-child::after{
+  /* keep the underline close to the title; content gets space via margin */
+  bottom: -12px;
+}
+
+/* Also ensure extra space specifically before the examples grid/table following a title */
+h2 + .examples{
+  margin-top: 34px !important;
+}
+
+</style>
+<style>
+/* BibTeX copy header */
+.cite-header{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+.cite-header h1,.cite-header h2,.cite-header h3,.cite-header h4{
+  margin:0; position:relative; /* keep underline pseudo-element positioning */
+}
+.btn-copy{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:8px 12px; border-radius:12px; border:1px solid var(--line-soft);
+  background: var(--accent); color:#fff; font-weight:600; letter-spacing:0.2px;
+  box-shadow: var(--shadow); cursor:pointer;
+}
+.btn-copy:hover{ filter: brightness(0.98); transform: translateY(-0.5px); }
+.btn-copy:active{ transform: translateY(0); }
+.btn-copy svg{ display:block }
+</style><style>
+/* Hide the original moving header */
+header { display: none !important; }
+
+
+/* Fixed CEVA logo top-left */
+#topLogo{
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  z-index: 9999;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 4px;
+  border-radius: 10px;
+  text-decoration: none;
+  background: transparent;
+}
+#topLogo img{
+  height: 34px;
+  width: auto;
+  display: block;
+  filter: none;
+}
+@media (min-width: 900px){
+  #topLogo img{ height: 38px; }
+}
+</style>
+<style>
+
+/* Override: larger, fixed CEVA logo */
+#topLogo{ position: fixed !important; }
+#topLogo img{ height: 56px !important; width: auto; }
+@media (min-width: 900px){
+  #topLogo img{ height: 72px !important; }
+}
+
+</style>
+<style>
+
+/* Absolute override to keep CEVA logo fixed at viewport top-left */
+#topLogo{
+  position: fixed !important;
+  top: 10px !important;
+  left: 14px !important;
+  z-index: 2147483647 !important; /* max stacking to stay above everything */
+  transform: none !important;
+}
+#topLogo img{
+  height: 64px !important; /* slightly larger on small screens */
+  width: auto !important;
+}
+@media (min-width: 900px){
+  #topLogo img{ height: 84px !important; } /* slightly larger on wide screens */
+}
+
+</style>
+<style>
+/* FINAL: Fix CEVA logo to viewport top-left and size it a bit larger */
+#topLogo{
+  position: fixed !important;
+  top: 8px !important;
+  left: 12px !important;
+  z-index: 2147483647 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  backface-visibility: hidden !important;
+  will-change: auto !important;
+}
+#topLogo img{
+  display: block !important;
+  height: 72px !important;   /* slightly larger */
+  width: auto !important;
+  max-width: none !important;
+}
+@media (min-width: 1000px){
+  #topLogo img{ height: 96px !important; } /* larger on desktop */
+}
+
+/* Guardrails: ensure nothing on root breaks fixed positioning */
+html, body{
+  transform: none !important;
+  filter: none !important;
+}
+</style><style>header{display:none!important}</style><style id="ceva-fixed-topbar-styles">
+/* === CEVA Transparent Fixed Top Bar === */
+#ceva-fixed-topbar {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 0 !important;              /* zero-height so it doesn't push layout */
+  background: transparent !important; /* no background as requested */
+  z-index: 2147483647 !important;
+  pointer-events: none !important;    /* the bar itself doesn't block clicks */
+}
+#ceva-fixed-topbar .slot-left {
+  position: absolute !important;
+  top: 12px !important;
+  left: 12px !important;
+  pointer-events: auto !important;    /* but the logo itself is clickable */
+}
+#ceva-fixed-topbar .slot-left a {
+  display: inline-block !important;
+  text-decoration: none !important;
+  line-height: 0 !important;
+}
+#ceva-fixed-topbar .slot-left img {
+  display: block !important;
+  height: 72px !important;   /* adjust size as you like */
+  width: auto !important;
+}
+@media (min-width: 1200px){
+  #ceva-fixed-topbar .slot-left img { height: 92px !important; }
+}
+</style><style>
+.title-with-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+.title-with-logo img {
+  max-height: 40px;
+  width: auto;
+  object-fit: contain;
+}
+</style><style>
+/* Enlarge CEVA logo and add space before title */
+.title-with-logo img {
+  max-height: 80px !important; /* enlarge logo */
+  margin-bottom: 12px;         /* space between logo and title */
+}
+</style><style>
+/* Increase spacing and keep logo above title */
+.title-with-logo a img {
+  max-height: 96px !important; /* larger logo */
+}
+.title-with-logo a {
+  display: inline-block;
+  margin-bottom: 24px; /* more padding between logo and title */
+}
+</style><style>
+/* Larger CEVA logo */
+.title-with-logo a img {
+  max-height: 128px !important;
+}
+
+/* Keep generous gap between logo and title (from the previous step) */
+.title-with-logo a {
+  display: inline-block;
+  margin-bottom: 24px;
+}
+
+/* Bring the hero section closer to the top of the page */
+body {
+  margin-top: 0 !important;
+}
+section.hero {
+  padding-top: 8px !important;
+  margin-top: 0 !important;
+}
+.hero-card.wrap {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+</style>
+<style>
+/* === Requested tweaks ======================================= */
+/* 1) Enlarge the font of the text ONLY in the TL;DR box */
+.tldr p, .tldr li { 
+  font-size: 18px; 
+  line-height: 1.75; 
+}
+
+/* 2) In the examples, align ONLY the "Examples" header to the left */
+#examples > h2 {
+  text-align: left !important;
+}
+/* Keep the underline attached to the left edge for this header only */
+#examples > h2::after {
+  left: 0;
+  transform: none;
+}
+</style>
+
+
+<style>
+/* === Adjustments per follow-up ================================= */
+/* Revert the Examples section title to centered */
+#examples > h2 { 
+  text-align: center !important; 
+}
+#examples > h2::after { 
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Left-align ONLY the first column header ("Example") in the examples table */
+#examples table th:first-child {
+  text-align: left !important;
+}
+
+/* (Optional nicety) Make the first column cells left-aligned too for visual consistency */
+#examples table td:first-child {
+  text-align: left;
+}
+</style>
+
+
+<style>
+/* === Precise fix: left-align ONLY the first column header cell ("Example") in the grid === */
+#examples .ex-grid > .head:first-child {
+  text-align: left !important;
+  justify-self: start !important;   /* if headers are laid out with CSS Grid */
+}
+#examples .ex-grid > .head:first-child > * {
+  margin-left: 0 !important;
+  margin-right: auto !important;    /* guard against flex-centered inner wrappers */
+}
+</style>
+
+
+<style>
+/* === Center the entire "Example" column (grid-based layout) === */
+#examples .ex-grid > :nth-child(6n+1) {
+  text-align: center !important;
+  justify-self: center !important;
+}
+
+/* Ensure the header cell ("Example") is centered */
+#examples .ex-grid > .head:first-child {
+  text-align: center !important;
+  justify-self: center !important;
+}
+#examples .ex-grid > .head:first-child > * {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Override any tag rule that left-aligns first-column labels */
+#examples .ex-grid .tag {
+  text-align: center !important;
+  justify-self: center !important;
+}
+
+/* If a table is ever used instead of the grid, center the first column there too */
+#examples table th:first-child,
+#examples table td:first-child {
+  text-align: center !important;
+}
+</style>
+
+
+<style>
+/* === Back-to-top floating button ======================================= */
+#toTopBtn {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  outline: none;
+  background: #000;
+  color: #fff;
+  display: none; /* toggled via JS */
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 9999;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+}
+
+#toTopBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.28);
+}
+
+#toTopBtn:active {
+  transform: translateY(0);
+}
+
+#toTopBtn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* Visually-hidden utility for a11y text */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 1px, 1px);
+  white-space: nowrap;
+  border: 0;
+}
+</style>
+
+
+<style>
+/* === Increase spacing between "AI Division, Ceva Technologies" line and the 3 buttons === */
+/* Try common structures used in the page: */
+.hero .kicker,
+.hero .subhead,
+.hero .subtitle,
+.hero p.kicker,
+.header .kicker,
+.header .subhead,
+.header .subtitle {
+  margin-bottom: 28px !important;
+}
+
+/* Also ensure the button group itself has a generous top margin */
+.hero .cta,
+.hero .cta-group,
+.hero .actions,
+.header .cta,
+.header .cta-group,
+.header .actions {
+  margin-top: 28px !important;
+}
+
+/* If the line is a plain <p> just before the buttons, make the next element have spacing */
+.hero p + .cta,
+.hero p + .cta-group,
+.hero p + .actions {
+  margin-top: 28px !important;
+}
+
+/* A universal fallback: specifically target an element that literally contains the text.
+   We can't use :contains in pure CSS, but if the element has data-label set in markup,
+   we add a general rule for first button row to get more space from preceding content. */
+main .cta-group:first-of-type { margin-top: 28px !important; }
+</style>
+
+
+<style>
+/* === Precise spacing between subtitle and the 3 buttons === */
+p.subtitle { margin-bottom: 28px !important; }
+p.subtitle + .publication-links { margin-top: 0 !important; } /* rely on the subtitle's margin */
+</style>
+
+
+<style id="btn-black-to-orange">
+/* Make Paper, arXiv, and Code buttons black by default,
+   and switch to the existing orange gradient on hover */
+.publication-links .button{
+  background: #000 !important;
+  color: #fff !important;
+  border-color: #000 !important;
+}
+.publication-links .button .icon{
+  color: inherit !important; /* keep icons same color as text */
+}
+.publication-links .button:hover{
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent), white 14%),
+    color-mix(in srgb, var(--accent-2), white 8%)
+  ) !important; /* identical orange as current Paper button */
+  color: #111 !important;
+  border-color: var(--accent) !important;
+  text-decoration: none !important; /* avoid underline on hover */
+}
+.publication-links .button:focus-visible{
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+</style>
+
+<style id="architecture-box-css">
+#architecture .img-row{
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  align-items: start; /* default top alignment */
+}
+#architecture figure{ margin: 0; }
+#architecture img{
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+}
+#architecture figcaption{
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--muted-text, #666);
+  margin-top: 0.5rem;
+}
+/* Bottom-align the second (right) figure so extra space sits above it */
+#architecture .img-row figure:last-child{
+  align-self: end;
+}
+@media (max-width: 800px){
+  #architecture .img-row{ grid-template-columns: 1fr; }
+  #architecture .img-row figure:last-child{ align-self: auto; } /* normal flow on mobile */
+}
+</style>
+
+<style>
+/* Swap Hugging Face icon on hover (black -> white) to match other buttons */
+.publication-links .link-block .hf-icon .hf-icon-white {
+  display: inline-block !important;  /* default: white icon on black button */
+}
+.publication-links .link-block .hf-icon .hf-icon-black {
+  display: none !important;
+}
+.publication-links .link-block a:hover .hf-icon .hf-icon-black {
+  display: inline-block !important;  /* hover: black icon on orange button */
+}
+.publication-links .link-block a:hover .hf-icon .hf-icon-white {
+  display: none !important;
+}
+</style>
+<style id="audio-examples-picker-css">
+/* === Audio Examples: selector + rows ==================================== */
+#aeShell.ae-shell{
+  overflow: visible;
+  margin-top: 22px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line-soft);
+  background:
+    radial-gradient(900px 420px at 10% 0%, rgba(255,122,26,0.08), transparent 55%),
+    radial-gradient(780px 420px at 90% 0%, rgba(255,154,74,0.06), transparent 60%),
+    #fff;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.06);
+}
+
+.ae-toolbar{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px 16px;
+}
+
+.ae-select label{
+  display: block;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.ae-select-row{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#aeExample{
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  min-width: min(520px, 74vw);
+  max-width: 100%;
+  padding: 11px 40px 11px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line-soft);
+  background:
+    linear-gradient(180deg, #fff, #fff),
+    radial-gradient(10px 10px at 92% 55%, rgba(255,122,26,0.22), transparent 55%);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.05);
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+}
+
+#aeExample:focus-visible{
+  border-color: rgba(255,122,26,0.65);
+  box-shadow: 0 0 0 4px rgba(255,122,26,0.14), 0 12px 24px rgba(0,0,0,0.06);
+}
+
+.ae-btn{
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: 1px solid var(--line-soft);
+  background: #fff;
+  box-shadow: 0 10px 22px rgba(0,0,0,0.05);
+  cursor: pointer;
+  font-weight: 900;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease, background-color .12s ease;
+}
+.ae-btn:hover{
+  transform: translateY(-1px);
+  border-color: rgba(255,122,26,0.32);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.08);
+}
+.ae-btn:active{ transform: translateY(0); }
+.ae-btn:focus-visible{
+  outline: none;
+  border-color: rgba(255,122,26,0.60);
+  box-shadow: 0 0 0 4px rgba(255,122,26,0.14), 0 14px 30px rgba(0,0,0,0.08);
+}
+.ae-btn-ghost{
+  background: color-mix(in srgb, var(--accent), white 94%);
+  border-color: rgba(255,122,26,0.28);
+}
+
+.ae-signals{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* Each signal is a row */
+.ae-card{
+  background: rgba(255,255,255,0.92);
+  border: 1px solid rgba(0,0,0,0.10);
+  border-radius: 18px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.06);
+  position: relative;
+  overflow: hidden;
+
+  display: grid;
+  grid-template-columns: minmax(140px, 240px) 1fr auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.ae-card::before{
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, rgba(255,122,26,0.75), rgba(255,154,74,0.35));
+  opacity: 0.95;
+}
+
+.ae-card-head{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 6px;
+  z-index: 1;
+}
+
+.ae-signal{
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  font-size: 14px;
+  line-height: 1.15;
+  color: var(--text);
+}
+
+.ae-badge{
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,0.10);
+  background: #fff;
+  color: var(--muted);
+  white-space: nowrap;
+  width: fit-content;
+}
+.ae-badge[data-kind="input"]{
+  border-color: rgba(0,0,0,0.12);
+}
+.ae-badge[data-kind="baseline"]{
+  border-color: rgba(255,122,26,0.28);
+  background: color-mix(in srgb, var(--accent), white 92%);
+}
+.ae-badge[data-kind="ours"]{
+  border-color: rgba(30, 164, 78, 0.34);
+  background: color-mix(in srgb, #1ea44e, white 92%);
+}
+.ae-badge[data-kind="ref"]{
+  border-color: rgba(59, 130, 246, 0.34);
+  background: color-mix(in srgb, #3b82f6, white 92%);
+}
+
+.ae-mid{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1;
+}
+
+.ae-audio{
+  width: 100%;
+  max-width: 100%;
+  height: 40px;
+}
+
+.ae-missing{
+  display: none;
+  font-size: 12px;
+  color: #b42318;
+  font-weight: 800;
+}
+
+@media (max-width: 720px){
+  #aeExample{ min-width: 100%; }
+  .ae-card{
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .ae-card-head{ padding-left: 8px; }
+  }
+</style>
+
+
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+<section class="hero">
+<div class="hero-card wrap">
+<div class="title-with-logo"><a href="https://www.ceva-ip.com/"><img alt="CEVA logo" src="./fig/ceva_logo.png"/></a><h1><span class="em">DPDFNet: Boosting DeepFilterNet2 via Dual-Path RNN</span></h1></div>
+<p class="authors">
+<span class="author"><strong>Daniel Rika</strong></span>
+<span class="author"><strong>Nino Sapir</strong></span>
+<span class="author"><strong>Ido Gus</strong></span>
+</p>
+<p class="subtitle">AI Division, Ceva Technologies</p>
+<div class="publication-links">
+<span class="link-block">
+<a class="external-link button is-normal is-rounded is-orange" href="./paper/DPDFNet.pdf" rel="noopener" target="_blank">
+<span class="icon"><i aria-hidden="true" class="fas fa-file-pdf"></i></span>
+<span>Paper</span>
+</a>
+</span>
+<span class="link-block">
+<a class="external-link button is-normal is-rounded is-orange is-outlined" href="https://arxiv.org/abs/XXXX.XXXXX" rel="noopener" target="_blank">
+<span class="icon"><i aria-hidden="true" class="ai ai-arxiv"></i></span>
+<span>arXiv</span>
+</a>
+</span>
+<span class="link-block">
+<a class="external-link button is-normal is-rounded is-orange is-outlined" href="https://github.com/ceva-ip/DPDFNet" rel="noopener" target="_blank">
+<span class="icon"><i aria-hidden="true" class="fab fa-github"></i></span>
+<span>Code</span>
+</a>
+</span>
+<span class="link-block">
+<a class="external-link button is-normal is-rounded is-orange is-outlined" href="https://huggingface.co/Ceva-IP/DPDFNet" rel="noopener" target="_blank">
+<span class="icon hf-icon">
+  <img class="hf-icon-black" src="./fig/hf-icon_black.png"
+       alt="Hugging Face logo (black)"
+       style="width:1.1em;height:1.1em;vertical-align:middle;" />
+  <img class="hf-icon-white" src="./fig/hf-icon_white.png"
+       alt="Hugging Face logo (white)"
+       style="width:1.1em;height:1.1em;vertical-align:middle;" />
+</span>
+<span>Hugging Face</span>
+</a>
+</span>
+</div>
+</div>
+</section>
+<div class="wrap">
+<!-- TL;DR separate block inserted before Abstract section -->
+<section class="tldr card" id="tldr">
+<h2>TL;DR</h2>
+<p>DPDFNet is a causal, streaming speech enhancer that adds dual‑path RNN blocks to DeepFilterNet2’s encoder to improve cross‑band and temporal modeling for robust real‑time noise suppression.</p>
+</section>
+<section class="card" id="abstract">
+<h2>Abstract</h2>
+<p>We present DPDFNet, a causal single-channel speech enhancement model that extends DeepFilterNet2 architecture with dual-path blocks in the encoder, strengthening long-range temporal and cross-band modeling while preserving the original enhancement framework. In addition, we demonstrate that adding a loss component to mitigate over-attenuation in the enhanced speech, combined with a fine-tuning phase tailored for “always-on” applications, leads to substantial improvements in overall model performance. To compare our proposed architecture with a variety of causal open-source models, we created a new evaluation set comprising long, low-SNR recordings in 12 languages across everyday noise scenarios, better reflecting real-world conditions than commonly used benchmarks. On this evaluation set, DPDFNet delivers superior performance to other causal open-source models, including some that are substantially larger and more computationally demanding. We also propose an holistic metric named PRISM, a composite, scale-normalized aggregate of intrusive and non-intrusive metrics, which demonstrates clear scalability with the number of dual-path blocks. We further demonstrate on-device feasibility by deploying DPDFNet on Ceva-NeuPro™-Nano edge NPUs. Results indicate that DPDFNet-4, our second-largest model, achieves real-time performance on NPN32 and runs even faster on NPN64, confirming that state-of-the-art quality can be sustained within strict embedded power and latency constraints.</p>
+</section>
+
+<section class="card" id="architecture">
+  <h2>The Architecture</h2>
+  <div class="img-row">
+    <figure>
+      <img src="./fig/dpdfnet_arch.png" alt="DPDFNet overall architecture">
+      <figcaption>DPDFNet overall architecture</figcaption>
+    </figure>
+    <figure>
+      <img src="./fig/dprnn_block.png" alt="DPRNN block diagram">
+      <figcaption>Dual-Path RNN (DPRNN) block</figcaption>
+    </figure>
+  </div>
+</section>
+
+
+
+<section class="card" id="realtime-npn">
+  <h2>Ceva‑NeuPro™‑Nano</h2>
+
+  <p style="margin-top:0.35rem;">
+	The benchmarks below were obtained on Ceva‑NeuPro™‑Nano edge NPUs (32/64), for the DPDFNet family, assuming deployment with int8 weights and int16 activations.
+  </p>
+
+  <div id="rtfPlot" style="width:100%;height:420px;"></div>
+</section>
+
+<section class="card" id="examples">
+<h2>Audio Examples</h2>
+<p>
+		Each example is a 15-second audio clip from our proposed evaluation set, presented at an SNR of 0 dB.<br/>
+		The clips feature different languages and background noises.<br/>
+		The following examples allow you to listen and compare the outputs generated by different models.
+	  </p>
+<div class="examples ae-shell" id="aeShell">
+  <div class="ae-toolbar" role="group" aria-label="Audio examples selector">
+    <div class="ae-select">
+      <label for="aeExample">Choose an example</label>
+      <div class="ae-select-row">
+        <button class="ae-btn" id="aePrev" type="button" aria-label="Previous example" title="Previous">←</button>
+        <select id="aeExample" aria-label="Select an audio example"></select>
+        <button class="ae-btn" id="aeNext" type="button" aria-label="Next example" title="Next">→</button>
+</div>
+</div>
+</div>
+
+  <div class="ae-signals" id="aeSignals" role="list" aria-label="Signals for selected example">
+    <!-- Populated by JS -->
+  </div>
+</div></section>
+<section class="card" id="citation">
+<div class="cite-header"><h2>BibTeX</h2><button aria-label="Copy BibTeX citation" class="btn-copy" id="bibtexCopyBtn" type="button"><svg aria-hidden="true" fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="18" xmlns="http://www.w3.org/2000/svg"><rect height="13" rx="2" ry="2" width="13" x="9" y="9"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span>copy</span></button></div>
+<pre class="code bibtex" id="bibtexText">@inproceedings{rika2025dpdfnet,
+  title   = {DPDFNet: Boosting DeepFilterNet2 via Dual-Path RNN},
+  author  = {Rika, Daniel and Sapir, Nino and Gus, Ido},
+  year    = {2025},
+}</pre>
+</section>
+</div>
+<footer>
+<div class="wrap">
+<p>© <script>document.write(new Date().getFullYear());</script> • All rights reserved Ceva Inc.</p>
+</div>
+</footer>
+<script>
+    // Smooth scroll for hash links
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        const id = a.getAttribute('href').slice(1);
+        const el = document.getElementById(id);
+        if (el) { e.preventDefault(); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      });
+    });
+  </script>
+<script>
+(function(){
+  function copyBib(){
+    const pre = document.getElementById('bibtexText');
+    if(!pre) return;
+    const text = pre.innerText || pre.textContent || '';
+    if (!text) return;
+    const btn = document.getElementById('bibtexCopyBtn');
+    function done(ok){
+      if(!btn) return;
+      const old = btn.querySelector('span');
+      if (old) {
+        const prev = old.textContent;
+        old.textContent = ok ? 'copied!' : 'failed';
+        btn.disabled = true;
+        setTimeout(()=>{ old.textContent = 'copy'; btn.disabled = false; }, 1200);
+      }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(()=>done(true)).catch(()=>done(false));
+    } else {
+      // Fallback for older browsers
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed'; ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      try { const ok = document.execCommand('copy'); done(ok); }
+      catch(e){ done(false); }
+      finally { document.body.removeChild(ta); }
+    }
+  }
+  const btn = document.getElementById('bibtexCopyBtn');
+  if (btn) btn.addEventListener('click', copyBib);
+})();
+</script>
+<div aria-hidden="false" id="ceva-fixed-topbar"><div class="slot-left"><a aria-label="CEVA homepage" href="https://www.ceva-ip.com/" title="CEVA"></a></div></div>
+<!-- Back-to-top Button -->
+<button id="toTopBtn" aria-label="Back to top" title="Back to top">
+  <span class="sr-only">Back to top</span>
+  <!-- White up arrow inside a black circle -->
+  <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M6 14 L12 8 L18 14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</button>
+
+
+<script>
+(function() {
+  var btn = document.getElementById('toTopBtn');
+  if (!btn) return;
+
+  function toggleBtn() {
+    var y = window.pageYOffset || document.documentElement.scrollTop;
+    btn.style.display = (y > 120) ? 'flex' : 'none';
+  }
+
+  function scrollToTop() {
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch(e) {
+      // Fallback for very old browsers
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+  }
+
+  window.addEventListener('scroll', toggleBtn, { passive: true });
+  window.addEventListener('load', toggleBtn);
+  btn.addEventListener('click', scrollToTop);
+})();
+</script>
+
+<script id="audio-examples-picker-js">
+/* === Audio Examples data + UI ============================================
+   Add new models/signals by extending the `signals` array for each example.
+   Each signal: { name, kind, file } where:
+     kind ∈ "input" | "baseline" | "ours" | "ref" | "other"
+*/
+(function(){
+  const MODEL_ORDER = [
+    { name: "Noisy", file: (id) => `${id}_rt60none_0_mixture.wav` },
+    { name: "DTLN", suffix: "dtln" },
+    { name: "GTCRN", suffix: "gtcrn" },
+    { name: "RNNoise", suffix: "rnnoise" },
+    { name: "NSNet2", suffix: "nsnet2" },
+    { name: "FullSubNet", suffix: "fullsubnet" },
+    { name: "aTENNuate", suffix: "atennuate" },
+    { name: "DPCRN", suffix: "dpcrn" },
+    { name: "CleanUNet", suffix: "cleanunet" },
+    { name: "DEMUCS", suffix: "demucs" },
+    { name: "DeepFilterNet2", suffix: "deepfilternet2" },
+    { name: "DeepFilterNet3", suffix: "deepfilternet3" },
+    { name: "Baseline", suffix: "baseline" },
+    { name: "DPDFNet-2", suffix: "dpdfnet2" },
+    { name: "DPDFNet-4", suffix: "dpdfnet4" },
+    { name: "DPDFNet-8", suffix: "dpdfnet8" },
+    { name: "Clean", file: (id) => `${id}_rt60none_0_clean.wav` }
+  ];
+
+  const SCENARIOS = [
+    "arabic_airport_snr0",
+    "dutch_restaurant_snr0",
+    "french_pub_snr0",
+    "german_car_snr0",
+    "korean_office_snr0",
+    "polish_street_snr0",
+    "portuguese_subway_snr0",
+    "russian_rain_snr0",
+    "spanish_train_snr0"
+  ];
+
+  function makeSignals(id){
+    return MODEL_ORDER.map(m => {
+      const file = m.file ? m.file(id) : `${id}_rt60none_0_mixture_${m.suffix}.wav`;
+      const kind = (m.name === "Noisy") ? "input" : (m.name === "Clean") ? "ref" : "model";
+      return { name: m.name, kind, file };
+    });
+  }
+
+  const AUDIO_EXAMPLES = SCENARIOS.map(id => {
+    const parts = id.split("_");
+    const lang = parts[0] || id;
+    const scene = parts[1] || "";
+    return {
+      id,
+      label: scene ? `${lang} | ${scene}` : lang,
+      dir: `./samples/short/${id}/`,
+      signals: makeSignals(id)
+    };
+  });
+
+  const $ = (id) => document.getElementById(id);
+  const shell = $("aeShell");
+  if (!shell) return;
+
+  const selectEl = $("aeExample");
+  const signalsEl = $("aeSignals");
+  const prevBtn = $("aePrev");
+  const nextBtn = $("aeNext");
+  const pauseAllBtn = $("aePauseAll");
+
+  function pauseAll(){
+  shell.querySelectorAll("audio").forEach(a => { try { a.pause(); } catch(e){} });
+}
+
+
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[c]));
+  }
+
+  function kindLabel(kind){
+    const k = (kind || "other").toLowerCase();
+    if (k === "input") return "Input";
+    if (k === "baseline") return "Baseline";
+    if (k === "ours") return "Ours";
+    if (k === "ref") return "Clean";
+    return "Model";
+  }
+
+  function renderSignals(ex){
+    signalsEl.innerHTML = "";
+
+    (ex.signals || []).forEach(sig => {
+      const row = document.createElement("div");
+      row.className = "ae-card";
+      row.setAttribute("role", "listitem");
+
+      const head = document.createElement("div");
+      head.className = "ae-card-head";
+
+      const title = document.createElement("div");
+      title.className = "ae-signal";
+      title.textContent = sig.name;
+      head.appendChild(title);
+
+      const mid = document.createElement("div");
+      mid.className = "ae-mid";
+
+      const audio = document.createElement("audio");
+      audio.className = "ae-audio";
+      audio.setAttribute("controls", "");
+      audio.setAttribute("preload", "none");
+
+      const src = document.createElement("source");
+      const full = ex.dir + sig.file;
+      src.src = full;
+      src.type = "audio/wav";
+      audio.appendChild(src);
+
+      const missing = document.createElement("div");
+      missing.className = "ae-missing";
+      missing.textContent = "Audio file not found (check path).";
+
+      audio.addEventListener("error", () => {
+        missing.style.display = "block";
+      });
+
+      // Always-solo playback: pause all other audios when one starts
+      audio.addEventListener("play", () => {
+        shell.querySelectorAll("audio").forEach(other => {
+          if (other !== audio) { try { other.pause(); } catch(e){} }
+        });
+      });
+
+      mid.appendChild(audio);
+      mid.appendChild(missing);
+
+      row.appendChild(head);
+      row.appendChild(mid);
+      signalsEl.appendChild(row);
+    });
+  }
+
+  function getIndexById(id){
+    return AUDIO_EXAMPLES.findIndex(e => e.id === id);
+  }
+
+  function renderByIndex(i){
+    const clamped = (i + AUDIO_EXAMPLES.length) % AUDIO_EXAMPLES.length;
+    const ex = AUDIO_EXAMPLES[clamped];
+    selectEl.value = ex.id;
+    renderSignals(ex);
+    return clamped;
+  }
+
+  // Populate select
+  AUDIO_EXAMPLES.forEach(ex => {
+    const opt = document.createElement("option");
+    opt.value = ex.id;
+    opt.textContent = ex.label;
+    selectEl.appendChild(opt);
+  });
+
+  let idx = 0;
+  idx = renderByIndex(idx);
+
+  selectEl.addEventListener("change", () => {
+    pauseAll();
+    idx = getIndexById(selectEl.value);
+    if (idx < 0) idx = 0;
+    renderSignals(AUDIO_EXAMPLES[idx]);
+  });
+
+  prevBtn.addEventListener("click", () => {
+    pauseAll();
+    idx = renderByIndex(idx - 1);
+    selectEl.focus();
+  });
+
+  nextBtn.addEventListener("click", () => {
+    pauseAll();
+    idx = renderByIndex(idx + 1);
+    selectEl.focus();
+  });
+
+  if (pauseAllBtn){
+    pauseAllBtn.addEventListener("click", () => pauseAll());
+  }
+
+  // Keyboard shortcuts when the selector is focused
+  selectEl.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { e.preventDefault(); prevBtn.click(); }
+    if (e.key === "ArrowRight") { e.preventDefault(); nextBtn.click(); }
+  });
+})();
+</script>
+
+
+<script id="rtf-plotly-script">
+(function(){
+  if (!window.Plotly) return;
+
+  const models = ["Baseline", "DPDFNet-2", "DPDFNet-4", "DPDFNet-8"];
+  const npn_clock = 500.0;
+
+  const neupro32_mips = [62, 273, 484, 907];
+  const neupro64_mips = [50, 221, 392, 735];
+
+  const neupro32 = neupro32_mips.map(v => v / npn_clock);
+  const neupro64 = neupro64_mips.map(v => v / npn_clock);
+
+  const CEVA = {
+    navy: "#05172b",
+    teal: "#006266",
+    orange: "#eb7d2d",
+    grey_dark: "#5b6e83",
+    grid_light: "#ebebeb"
+  };
+
+  function lighten(hex, factor){
+    hex = hex.replace("#","");
+    let r = parseInt(hex.slice(0,2), 16);
+    let g = parseInt(hex.slice(2,4), 16);
+    let b = parseInt(hex.slice(4,6), 16);
+    r = Math.round(r + (255 - r) * factor);
+    g = Math.round(g + (255 - g) * factor);
+    b = Math.round(b + (255 - b) * factor);
+    return "#" + [r,g,b].map(x => x.toString(16).padStart(2,"0")).join("");
+  }
+
+  const series1 = lighten(CEVA.teal, 0.65);
+  const series2 = lighten(CEVA.orange, 0.45);
+
+  const ymax = 1.08 * Math.max(Math.max(...neupro32), Math.max(...neupro64));
+
+  const trace1 = {
+    type: "bar",
+    name: "NeuPro-Nano 32\u00A0\u00A0\u00A0\u00A0\u00A0",
+    x: models,
+    y: neupro32,
+    marker: {color: series1, line: {color: CEVA.grey_dark, width: 0.5}},
+    text: neupro32.map(v => v.toFixed(3)),
+    textposition: "outside",
+    cliponaxis: false,
+    hovertemplate: "%{x}<br>%{fullData.name}: %{y:.3f}<extra></extra>"
+  };
+
+  const trace2 = {
+    type: "bar",
+    name: "NeuPro-Nano 64\u00A0\u00A0\u00A0\u00A0\u00A0",
+    x: models,
+    y: neupro64,
+    marker: {color: series2, line: {color: CEVA.grey_dark, width: 0.5}},
+    text: neupro64.map(v => v.toFixed(3)),
+    textposition: "outside",
+    cliponaxis: false,
+    hovertemplate: "%{x}<br>%{fullData.name}: %{y:.3f}<extra></extra>"
+  };
+
+  const layout = {
+    barmode: "group",
+    bargap: 0.25,
+    bargroupgap: 0.08,
+    margin: {l: 70, r: 20, t: 10, b: 60},
+    paper_bgcolor: "white",
+    plot_bgcolor: "#f5f5f5",
+    font: {family: "Inter, Amasis MT, Arial, sans-serif", size: 11, color: CEVA.navy},
+    legend: {
+      x: 0.02, y: 0.97,
+      xanchor: "left", yanchor: "top",
+      bgcolor: "white",
+      bordercolor: CEVA.grid_light,
+      borderwidth: 1,
+      itemsizing: "constant",
+      entrywidth: 210,
+      entrywidthmode: "pixels"
+    },
+    xaxis: {
+      showgrid: false,
+      showline: true,
+      linecolor: CEVA.grey_dark,
+      tickfont: {size: 12}
+    },
+    yaxis: {
+      title: {text: "Real-Time Factor", font: {color: CEVA.navy}},
+      range: [0, ymax],
+      showgrid: true,
+      gridcolor: CEVA.grid_light,
+      zeroline: false,
+      showline: true,
+      linecolor: CEVA.grey_dark,
+      tickfont: {size: 8}
+    },
+    shapes: [
+      {
+        type: "line",
+        xref: "paper",
+        x0: 0, x1: 1,
+        yref: "y",
+        y0: 1, y1: 1,
+        line: {color: CEVA.grey_dark, width: 2, dash: "dash"},
+        opacity: 0.3
+      }
+    ],
+    annotations: [
+      {
+        xref: "paper",
+        x: 0.06,
+        yref: "y",
+        y: 1,
+        text: "Real-time threshold",
+        showarrow: false,
+        xanchor: "left",
+        yanchor: "bottom",
+        font: {size: 12, color: CEVA.grey_dark},
+        yshift: 8,
+        opacity: 0.85
+      }
+    ]
+  };
+
+  const config = {responsive: true, displaylogo: false};
+
+  const el = document.getElementById("rtfPlot");
+  if (!el) return;
+  Plotly.newPlot(el, [trace1, trace2], layout, config);
+})();
+</script>
+
+</body>
+</html>
