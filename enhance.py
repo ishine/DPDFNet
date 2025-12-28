@@ -112,8 +112,11 @@ def enhance_file(in_path: Path, out_path: Path, model_name: str) -> None:
     audio = audio.astype(np.float32, copy=False)
     audio_16k = ensure_16k(audio, sr_in, 16000)
 
+    # Alignment compensation #1
+    audio_16k_pad = np.pad(audio_16k, (0, WIN_LEN), mode='constant', constant_values=0)
+    
     # STFT to frames (streaming)
-    spec = preprocessing(audio_16k)  # [1, T, F, 2]
+    spec = preprocessing(audio_16k_pad)  # [1, T, F, 2]
     num_frames = spec.shape[1]
 
     # New interpreter per file ensures stateful models (RNN/LSTM) start clean
@@ -141,6 +144,9 @@ def enhance_file(in_path: Path, out_path: Path, model_name: str) -> None:
     # iSTFT to waveform (16 kHz), then back to original SR for saving
     enhanced_16k = postprocessing(spec_e)
     enhanced = resample_back(enhanced_16k, sr_in)
+
+    # Alignment compensation #2
+    enhanced = enhanced[:audio.size]
 
     # Save as 16-bit PCM WAV, mono, original sample rate
     out_path.parent.mkdir(parents=True, exist_ok=True)
